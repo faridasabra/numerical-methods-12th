@@ -1,0 +1,82 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import sympy as sp  # type: ignore
+import math
+
+def newton_divided_difference_interpolation(x_vals, y_vals):
+    n = len(x_vals)
+    table = [[0]*n for _ in range(n)]
+
+    # Fill first column with y-values
+    for i in range(n):
+        table[i][0] = y_vals[i]
+
+    # Construct divided difference table
+    for j in range(1, n):
+        for i in range(n - j):
+            table[i][j] = (table[i+1][j-1] - table[i][j-1]) / (x_vals[i+j] - x_vals[i])
+
+    # Extract coefficients from the top of each column
+    coeffs = [table[0][j] for j in range(n)]
+
+    # Build the Newton polynomial using sympy
+    x = sp.symbols('x')
+    polynomial = coeffs[0]
+    term = 1
+    for i in range(1, n):
+        term *= (x - x_vals[i-1])
+        polynomial += coeffs[i] * term
+
+    polynomial = sp.simplify(polynomial)
+    return coeffs, polynomial, pd.DataFrame(table).round(6)
+
+
+def display_interpolation_table(x_vals, y_vals, coeffs, polynomial, df):
+    fig, (ax_text, ax_table) = plt.subplots(nrows=1, ncols=2, figsize=(12, 3), facecolor="lightblue")
+
+    ax_text.axis("off")
+    ax_text.text(0.5, 0.7, "Newton Divided Difference Interpolation", fontsize=12, fontweight="bold", ha="center", color="black")
+    ax_text.text(0.5, 0.5, f"Interpolating Polynomial:\n{sp.pretty(polynomial)}", fontsize=10, ha="center", fontweight="bold", color="darkblue", wrap=True)
+
+    ax_table.axis("tight")
+    ax_table.axis("off")
+    table = ax_table.table(cellText=df.values,
+                           colLabels=[f"Δ^{i}y" if i > 0 else "y" for i in range(len(x_vals))],
+                           rowLabels=[f"x={x_vals[i]}" for i in range(len(x_vals))],
+                           cellLoc="center", loc="center",
+                           cellColours=[["white"] * len(x_vals)] * len(x_vals),
+                           colColours=["lightgray"] * len(x_vals))
+
+    table.auto_set_font_size(False)
+    table.set_fontsize(9)
+    table.auto_set_column_width(col=list(range(len(df.columns))))
+
+    for key, cell in table.get_celld().items():
+        cell.set_edgecolor("black")
+        cell.set_linewidth(1)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def interpolation_interface():
+    x_vals = list(map(float, input("Enter x values (comma-separated): ").split(',')))
+    y_vals = list(map(float, input("Enter corresponding y values (comma-separated): ").split(',')))
+
+    if len(x_vals) != len(y_vals):
+        raise ValueError("x and y lists must be of equal length.")
+
+    coeffs, poly, df = newton_divided_difference_interpolation(x_vals, y_vals)
+    display_interpolation_table(x_vals, y_vals, coeffs, poly, df)
+
+    try:
+        x_val = float(input("Enter an x value to evaluate the polynomial (or press Enter to skip): ") or "nan")
+        if not math.isnan(x_val):
+            f = sp.lambdify(sp.symbols('x'), poly, 'math')
+            print(f"P({x_val}) = {f(x_val)}")
+    except ValueError:
+        pass
+
+
+if __name__ == "__main__":
+    interpolation_interface()
